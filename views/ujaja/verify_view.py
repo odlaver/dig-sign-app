@@ -56,7 +56,8 @@ class InstitutionVerifyView(ctk.CTkFrame):
         if result.get("valid"):
             text = (
                 "Status: Valid\n"
-                f"Ditandatangani oleh: {result['employee_name']} ({result['employee_email']})\n"
+                f"Ditandatangani oleh: {result['signer_name']}\n"
+                f"Diproses oleh: {result['operator_name']} ({result['operator_email']})\n"
                 f"Civitas ID: {result['employee_id']}\n"
                 f"Role: {result['position']}\n"
                 f"Issuer: {result['institution_name']}\n"

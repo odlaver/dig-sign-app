@@ -126,10 +126,10 @@ Urutan teknis saat klik sign:
 7. Buat kode verifikasi unik format `Ujaja-XXXXXXXXXXXX`.
 8. Buat overlay visual di halaman terakhir:
    - gambar tanda tangan kampus,
-   - nama pegawai,
+   - nama institusi sebagai penandatangan,
+   - nama civitas sebagai operator/pemohon,
    - role,
    - Civitas ID,
-   - issuer,
    - waktu,
    - QR,
    - kode verifikasi.

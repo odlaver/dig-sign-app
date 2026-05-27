@@ -134,12 +134,12 @@ def _build_overlay(
     c.drawString(text_x, y + 62, "Digitally Signed by:")
 
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(text_x, y + 49, _truncate(civitas["name"], 29))
+    c.drawString(text_x, y + 49, _truncate(INSTITUTION_NAME, 29))
 
     c.setFont("Helvetica", 8)
-    c.drawString(text_x, y + 38, f"Role: {_truncate(civitas['position'], 26)}")
+    c.drawString(text_x, y + 38, f"Operator: {_truncate(civitas['name'], 27)}")
     c.drawString(text_x, y + 27, f"Civitas ID: {civitas['employee_id']}")
-    c.drawString(text_x, y + 16, f"Issuer: {_truncate(INSTITUTION_NAME + ' CA', 34)}")
+    c.drawString(text_x, y + 16, f"Role: {_truncate(civitas['position'], 32)}")
     c.drawString(text_x, y + 5, f"Verification Code: {verification_code}")
     c.drawString(x + block_width - 134, y + 7, f"Date: {signed_at[:19]}")
 
@@ -180,7 +180,9 @@ def _write_institution_pdf(
         "/Producer": "Ujaja Sign",
         "/UjajaSignMode": "institution",
         "/UjajaSignInstitution": INSTITUTION_NAME,
-        "/UjajaSignSigner": civitas["name"],
+        "/UjajaSignSigner": INSTITUTION_NAME,
+        "/UjajaSignOperator": civitas["name"],
+        "/UjajaSignOperatorEmail": civitas["email"],
         "/UjajaSignCode": verification_code,
         "/UjajaSignCivitasId": civitas["employee_id"],
         "/UjajaSignCASerial": CA_SERIAL,
@@ -298,7 +300,7 @@ def sign_institution_pdf(
     log_action(
         user["id"],
         "INSTITUTION_SIGN_PDF",
-        f"Dokumen {source.name} ditandatangani oleh {user['name']} dengan issuer {INSTITUTION_NAME} ({verification_code}).",
+        f"Dokumen {source.name} ditandatangani oleh {INSTITUTION_NAME}; operator {user['name']} ({verification_code}).",
     )
     return {
         "output_path": output_path,
@@ -490,7 +492,10 @@ def verify_institution_pdf(pdf_path: str | Path) -> dict:
         "signature_valid": signature_valid,
         "current_hash": current_hash,
         "stored_hash": document["signed_hash"],
+        "signer_name": INSTITUTION_NAME,
         "institution_name": INSTITUTION_NAME,
+        "operator_name": document["employee_name"],
+        "operator_email": document["employee_email"],
         "employee_name": document["employee_name"],
         "employee_email": document["employee_email"],
         "employee_id": document["employee_code"],

@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
 
 from core import auth, database, otp_service
 from ujaja import ca_service, civitas_service, institution_signer
+from ujaja.ca_service import INSTITUTION_NAME
 
 
 def count_pdf_signatures(path: Path) -> int:
@@ -116,6 +117,8 @@ def main() -> None:
         valid_result = institution_signer.verify_institution_pdf(signed_path)
         assert valid_result["valid"], valid_result
         assert valid_result["signature_valid"], valid_result
+        assert valid_result["signer_name"] == INSTITUTION_NAME, valid_result
+        assert valid_result["operator_email"] == email, valid_result
 
         shutil.copyfile(signed_path, tampered_pdf)
         with open(tampered_pdf, "ab") as file:
