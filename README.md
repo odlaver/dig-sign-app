@@ -21,6 +21,12 @@ File ini bersifat portable, jadi bisa langsung dijalankan tanpa install Python.
 
 Mode Universitas Jaya Jaya menambahkan digital signature PDF standar dengan pyHanko. Acrobat/Foxit dapat membaca signature ini di panel signature. Karena sertifikat Ujaja dibuat lokal untuk simulasi, status trust penuh membutuhkan import `Ujaja Root CA` dari menu Certificate Authority aplikasi.
 
+Panduan verifikasi:
+
+```text
+docs/CARA_VERIFIKASI_ACROBAT_FOXIT.md
+```
+
 ## Struktur Inti
 
 ```text
