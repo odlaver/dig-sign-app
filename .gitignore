@@ -10,3 +10,6 @@ assets/qrcodes/*.png
 assets/signatures/*.png
 assets/signed_docs/*.pdf
 assets/temp/*
+build/
+dist/
+*.spec

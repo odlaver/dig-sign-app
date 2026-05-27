@@ -1,11 +1,20 @@
 from pathlib import Path
 import sqlite3
+import sys
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+def _project_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[1]
+
+
+PROJECT_ROOT = _project_root()
+BUNDLED_ROOT = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT))
 DATA_DIR = PROJECT_ROOT / "data"
 ASSETS_DIR = PROJECT_ROOT / "assets"
 SOURCE_ASSETS_DIR = ASSETS_DIR / "source"
+BUNDLED_SOURCE_ASSETS_DIR = BUNDLED_ROOT / "assets" / "source"
 SIGNATURES_DIR = ASSETS_DIR / "signatures"
 QRCODES_DIR = ASSETS_DIR / "qrcodes"
 SIGNED_DOCS_DIR = ASSETS_DIR / "signed_docs"

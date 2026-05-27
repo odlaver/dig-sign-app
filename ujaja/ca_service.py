@@ -7,7 +7,13 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from PIL import Image, ImageDraw, ImageFont
 
-from core.database import CA_DIR, UJAJA_DIR, SOURCE_ASSETS_DIR, get_connection
+from core.database import (
+    BUNDLED_SOURCE_ASSETS_DIR,
+    CA_DIR,
+    SOURCE_ASSETS_DIR,
+    UJAJA_DIR,
+    get_connection,
+)
 
 
 INSTITUTION_NAME = "Universitas Jaya Jaya"
@@ -16,6 +22,7 @@ CA_SERIAL = "Ujaja-CA-ROOT-0001"
 DIGITAL_ID_NAME = "Ujaja Academic Digital ID"
 DIGITAL_ID_SERIAL = "Ujaja-DID-0001"
 SOURCE_SIGNATURE_FILE = SOURCE_ASSETS_DIR / "ttdreval.png"
+BUNDLED_SIGNATURE_FILE = BUNDLED_SOURCE_ASSETS_DIR / "ttdreval.png"
 CA_FILE = CA_DIR / "ujaja_root_ca.pem"
 UJAJA_SIGNATURE_FILE = UJAJA_DIR / "ujaja_signature.png"
 
@@ -74,8 +81,9 @@ def make_signature_payload(
 
 def ensure_ujaja_signature_asset() -> Path:
     UJAJA_DIR.mkdir(parents=True, exist_ok=True)
-    if SOURCE_SIGNATURE_FILE.exists():
-        source = Image.open(SOURCE_SIGNATURE_FILE).convert("RGBA")
+    source_path = SOURCE_SIGNATURE_FILE if SOURCE_SIGNATURE_FILE.exists() else BUNDLED_SIGNATURE_FILE
+    if source_path.exists():
+        source = Image.open(source_path).convert("RGBA")
         padding = 18
         image = Image.new(
             "RGBA",
