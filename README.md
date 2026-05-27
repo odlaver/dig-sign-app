@@ -17,6 +17,10 @@ release/UjajaSign.exe
 
 File ini bersifat portable, jadi bisa langsung dijalankan tanpa install Python.
 
+## Acrobat/Foxit
+
+Mode Universitas Jaya Jaya menambahkan digital signature PDF standar dengan pyHanko. Acrobat/Foxit dapat membaca signature ini di panel signature. Karena sertifikat Ujaja dibuat lokal untuk simulasi, status trust penuh membutuhkan import `Ujaja Root CA` dari menu Certificate Authority aplikasi.
+
 ## Struktur Inti
 
 ```text

@@ -1,10 +1,12 @@
 from base64 import b64decode, b64encode
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.x509.oid import NameOID
 from PIL import Image, ImageDraw, ImageFont
 
 from core.database import (
@@ -23,7 +25,10 @@ DIGITAL_ID_NAME = "Ujaja Academic Digital ID"
 DIGITAL_ID_SERIAL = "Ujaja-DID-0001"
 SOURCE_SIGNATURE_FILE = SOURCE_ASSETS_DIR / "ttdreval.png"
 BUNDLED_SIGNATURE_FILE = BUNDLED_SOURCE_ASSETS_DIR / "ttdreval.png"
-CA_FILE = CA_DIR / "ujaja_root_ca.pem"
+CA_CERT_FILE = CA_DIR / "ujaja_root_ca.crt"
+SIGNER_KEY_FILE = CA_DIR / "ujaja_academic_signer_key.pem"
+SIGNER_CERT_FILE = CA_DIR / "ujaja_academic_signer.crt"
+CA_FILE = CA_CERT_FILE
 UJAJA_SIGNATURE_FILE = UJAJA_DIR / "ujaja_signature.png"
 
 
@@ -33,6 +38,14 @@ def _now() -> str:
 
 def _expires_at() -> str:
     return (datetime.now() + timedelta(days=365 * 3)).isoformat(timespec="seconds")
+
+
+def _cert_not_before():
+    return datetime.now(timezone.utc) - timedelta(minutes=5)
+
+
+def _cert_not_after():
+    return datetime.now(timezone.utc) + timedelta(days=365 * 3)
 
 
 def _generate_private_key():
@@ -54,12 +67,139 @@ def _public_key_pem(private_key) -> str:
     ).decode("ascii")
 
 
+def _certificate_pem(certificate: x509.Certificate) -> str:
+    return certificate.public_bytes(serialization.Encoding.PEM).decode("ascii")
+
+
 def _load_private_key(private_key_pem: str):
     return serialization.load_pem_private_key(private_key_pem.encode("ascii"), password=None)
 
 
 def _load_public_key(public_key_pem: str):
     return serialization.load_pem_public_key(public_key_pem.encode("ascii"))
+
+
+def _load_certificate(certificate_pem: str):
+    return x509.load_pem_x509_certificate(certificate_pem.encode("ascii"))
+
+
+def _public_key_from_certificate_pem(certificate_pem: str) -> str:
+    certificate = _load_certificate(certificate_pem)
+    return certificate.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("ascii")
+
+
+def _certificate_file_ready(path: Path) -> bool:
+    try:
+        content = path.read_text(encoding="ascii")
+        _load_certificate(content)
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def _private_key_file_ready(path: Path) -> bool:
+    try:
+        _load_private_key(path.read_text(encoding="ascii"))
+    except (OSError, ValueError, TypeError):
+        return False
+    return True
+
+
+def _build_root_certificate(root_key) -> x509.Certificate:
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "ID"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, INSTITUTION_NAME),
+            x509.NameAttribute(NameOID.COMMON_NAME, CA_NAME),
+        ]
+    )
+    return (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(root_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(_cert_not_before())
+        .not_valid_after(_cert_not_after())
+        .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=True,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=None,
+                decipher_only=None,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(root_key.public_key()),
+            critical=False,
+        )
+        .sign(root_key, hashes.SHA256())
+    )
+
+
+def _build_signer_certificate(root_key, root_certificate, signer_key) -> x509.Certificate:
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "ID"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, INSTITUTION_NAME),
+            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, "Academic Services"),
+            x509.NameAttribute(NameOID.COMMON_NAME, DIGITAL_ID_NAME),
+        ]
+    )
+    return (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(root_certificate.subject)
+        .public_key(signer_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(_cert_not_before())
+        .not_valid_after(_cert_not_after())
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=True,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=None,
+                decipher_only=None,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(root_key.public_key()),
+            critical=False,
+        )
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(signer_key.public_key()),
+            critical=False,
+        )
+        .sign(root_key, hashes.SHA256())
+    )
+
+
+def _identity_files_ready(ca, digital_id) -> bool:
+    if ca is None or digital_id is None:
+        return False
+    certificate_path = Path(digital_id["certificate_file_path"] or SIGNER_CERT_FILE)
+    return (
+        _certificate_file_ready(CA_CERT_FILE)
+        and _certificate_file_ready(certificate_path)
+        and _private_key_file_ready(SIGNER_KEY_FILE)
+    )
 
 
 def make_signature_payload(
@@ -142,15 +282,24 @@ def ensure_ujaja_identity() -> None:
             (DIGITAL_ID_SERIAL,),
         ).fetchone()
 
-        if ca and digital_id:
-            if not Path(ca["ca_file_path"]).exists():
-                Path(ca["ca_file_path"]).write_text(ca["public_key"], encoding="utf-8")
+        if _identity_files_ready(ca, digital_id):
+            private_key_pem = digital_id["private_key"]
+            if not SIGNER_KEY_FILE.exists():
+                SIGNER_KEY_FILE.write_text(private_key_pem, encoding="ascii")
             return
 
-        private_key = _generate_private_key()
-        private_pem = _private_key_pem(private_key)
-        public_pem = _public_key_pem(private_key)
-        CA_FILE.write_text(public_pem, encoding="utf-8")
+        root_key = _generate_private_key()
+        signer_key = _generate_private_key()
+        root_certificate = _build_root_certificate(root_key)
+        signer_certificate = _build_signer_certificate(root_key, root_certificate, signer_key)
+        root_certificate_pem = _certificate_pem(root_certificate)
+        signer_certificate_pem = _certificate_pem(signer_certificate)
+        private_pem = _private_key_pem(signer_key)
+        public_pem = _public_key_from_certificate_pem(signer_certificate_pem)
+
+        CA_CERT_FILE.write_text(root_certificate_pem, encoding="ascii")
+        SIGNER_CERT_FILE.write_text(signer_certificate_pem, encoding="ascii")
+        SIGNER_KEY_FILE.write_text(private_pem, encoding="ascii")
 
         if ca:
             conn.execute(
@@ -165,7 +314,7 @@ def ensure_ujaja_identity() -> None:
                     revoked_at = NULL
                 WHERE serial_number = ?
                 """,
-                (INSTITUTION_NAME, CA_NAME, public_pem, str(CA_FILE), _expires_at(), CA_SERIAL),
+                (INSTITUTION_NAME, CA_NAME, public_pem, str(CA_CERT_FILE), _expires_at(), CA_SERIAL),
             )
         else:
             conn.execute(
@@ -176,7 +325,7 @@ def ensure_ujaja_identity() -> None:
                 )
                 VALUES (?, ?, ?, ?, ?, 'Active', ?, ?)
                 """,
-                (INSTITUTION_NAME, CA_NAME, CA_SERIAL, public_pem, str(CA_FILE), _now(), _expires_at()),
+                (INSTITUTION_NAME, CA_NAME, CA_SERIAL, public_pem, str(CA_CERT_FILE), _now(), _expires_at()),
             )
 
         if digital_id:
@@ -196,7 +345,7 @@ def ensure_ujaja_identity() -> None:
                 (
                     INSTITUTION_NAME,
                     DIGITAL_ID_NAME,
-                    str(CA_FILE),
+                    str(SIGNER_CERT_FILE),
                     private_pem,
                     CA_SERIAL,
                     _expires_at(),
@@ -217,7 +366,7 @@ def ensure_ujaja_identity() -> None:
                     INSTITUTION_NAME,
                     DIGITAL_ID_NAME,
                     DIGITAL_ID_SERIAL,
-                    str(CA_FILE),
+                    str(SIGNER_CERT_FILE),
                     private_pem,
                     CA_SERIAL,
                     _now(),
@@ -252,6 +401,27 @@ def get_active_ujaja_ca():
 def get_active_ujaja_digital_id():
     digital_id = get_ujaja_digital_id()
     return digital_id if digital_id and digital_id["status"] == "Active" else None
+
+
+def get_ujaja_ca_certificate_path() -> Path:
+    ensure_ujaja_identity()
+    return CA_CERT_FILE
+
+
+def get_ujaja_signer_certificate_path() -> Path:
+    ensure_ujaja_identity()
+    return SIGNER_CERT_FILE
+
+
+def get_ujaja_signer_key_path() -> Path:
+    ensure_ujaja_identity()
+    return SIGNER_KEY_FILE
+
+
+def get_ujaja_digital_id_public_key_pem() -> str:
+    ensure_ujaja_identity()
+    certificate_pem = SIGNER_CERT_FILE.read_text(encoding="ascii")
+    return _public_key_from_certificate_pem(certificate_pem)
 
 
 def sign_payload(

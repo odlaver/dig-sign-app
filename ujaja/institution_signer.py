@@ -11,6 +11,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from core.audit import log_action
+from ujaja.acrobat_signature import apply_acrobat_signature
 from ujaja.ca_service import (
     CA_SERIAL,
     INSTITUTION_NAME,
@@ -18,6 +19,7 @@ from ujaja.ca_service import (
     ensure_ujaja_identity,
     get_active_ujaja_ca,
     get_active_ujaja_digital_id,
+    get_ujaja_digital_id_public_key_pem,
     get_ujaja_digital_id,
     get_ujaja_signature_path,
     sign_payload,
@@ -227,6 +229,7 @@ def sign_institution_pdf(
     output_name = f"{_safe_name(source.stem)}_{verification_code}_institution.pdf"
     output_path = SIGNED_DOCS_DIR / output_name
     unsigned_path = TEMP_DIR / f"{verification_code}_payload.pdf"
+    prepared_path = TEMP_DIR / f"{verification_code}_prepared.pdf"
 
     try:
         _write_institution_pdf(
@@ -247,7 +250,7 @@ def sign_institution_pdf(
         )
         _write_institution_pdf(
             source,
-            output_path,
+            prepared_path,
             civitas,
             verification_code,
             signed_at,
@@ -257,9 +260,12 @@ def sign_institution_pdf(
                 "/UjajaSignSignatureValue": signature_value,
             },
         )
+        apply_acrobat_signature(prepared_path, output_path, verification_code)
     finally:
         if unsigned_path.exists():
             unsigned_path.unlink()
+        if prepared_path.exists():
+            prepared_path.unlink()
 
     signed_hash = file_sha256(output_path)
     with get_connection() as conn:
@@ -432,7 +438,7 @@ def verify_institution_pdf(pdf_path: str | Path) -> dict:
         document["ca_serial_number"],
         document["ujaja_digital_id_serial"],
         document["signature_value"],
-        ca["public_key"],
+        get_ujaja_digital_id_public_key_pem(),
     )
 
     valid = (

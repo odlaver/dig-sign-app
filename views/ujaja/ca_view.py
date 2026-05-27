@@ -52,9 +52,9 @@ class CertificateAuthorityView(ctk.CTkFrame):
         source = Path(self.ca["ca_file_path"])
         target = filedialog.asksaveasfilename(
             title="Simpan CA Universitas Jaya Jaya",
-            defaultextension=".pem",
-            initialfile="universitas_jaya_jaya_root_ca.pem",
-            filetypes=[("PEM files", "*.pem"), ("All files", "*.*")],
+            defaultextension=".crt",
+            initialfile="universitas_jaya_jaya_root_ca.crt",
+            filetypes=[("Certificate files", "*.crt"), ("PEM files", "*.pem"), ("All files", "*.*")],
         )
         if not target:
             return

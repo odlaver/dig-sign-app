@@ -4,6 +4,10 @@ import sys
 import uuid
 
 import pyotp
+from pyhanko.keys import load_cert_from_pemder
+from pyhanko.pdf_utils.reader import PdfFileReader
+from pyhanko.sign.validation import validate_pdf_signature
+from pyhanko_certvalidator.context import ValidationContext
 from reportlab.pdfgen import canvas
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,7 +15,28 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core import auth, database, otp_service
-from ujaja import civitas_service, institution_signer
+from ujaja import ca_service, civitas_service, institution_signer
+
+
+def count_pdf_signatures(path: Path) -> int:
+    with open(path, "rb") as file:
+        reader = PdfFileReader(file)
+        return len(reader.embedded_regular_signatures)
+
+
+def assert_pdf_signature_valid(path: Path) -> None:
+    with open(path, "rb") as file:
+        reader = PdfFileReader(file)
+        root = load_cert_from_pemder(str(ca_service.get_ujaja_ca_certificate_path()))
+        validation_context = ValidationContext(trust_roots=[root], allow_fetching=False)
+        status = validate_pdf_signature(
+            reader.embedded_regular_signatures[0],
+            signer_validation_context=validation_context,
+            skip_diff=True,
+        )
+        assert status.intact, status.summary()
+        assert status.valid, status.summary()
+        assert status.trusted, status.summary()
 
 
 def make_pdf(path: Path) -> None:
@@ -85,6 +110,8 @@ def main() -> None:
         verification_code = result["verification_code"]
         assert signed_path.exists()
         assert result["signature_value"]
+        assert count_pdf_signatures(signed_path) >= 1
+        assert_pdf_signature_valid(signed_path)
 
         valid_result = institution_signer.verify_institution_pdf(signed_path)
         assert valid_result["valid"], valid_result
