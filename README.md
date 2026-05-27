@@ -9,6 +9,14 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
+## Windows EXE
+
+```text
+release/UjajaSign.exe
+```
+
+File ini bersifat portable, jadi bisa langsung dijalankan tanpa install Python.
+
 ## Struktur Inti
 
 ```text
@@ -18,6 +26,7 @@ self_signed/      logic Self-Signed Digital
 ujaja/            logic Universitas Jaya Jaya
 views/            UI CustomTkinter
 assets/source/    aset tanda tangan sumber
+release/          EXE siap jalan
 tests/            smoke test per flow
 docs/             panduan acuan
 requirements.txt
