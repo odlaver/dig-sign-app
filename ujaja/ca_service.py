@@ -21,7 +21,7 @@ from core.database import (
 INSTITUTION_NAME = "Universitas Jaya Jaya"
 CA_NAME = "Ujaja Root CA"
 CA_SERIAL = "Ujaja-CA-ROOT-0001"
-DIGITAL_ID_NAME = "Ujaja Academic Digital ID"
+DIGITAL_ID_NAME = "Universitas Jaya Jaya"
 DIGITAL_ID_SERIAL = "Ujaja-DID-0001"
 SOURCE_SIGNATURE_FILE = SOURCE_ASSETS_DIR / "ttdreval.png"
 BUNDLED_SIGNATURE_FILE = BUNDLED_SOURCE_ASSETS_DIR / "ttdreval.png"
