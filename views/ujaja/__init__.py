@@ -1,0 +1,1 @@
+"""Universitas Jaya Jaya views."""

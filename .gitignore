@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+data/*.db
+assets/ca/*.pem
+assets/ca/*.crt
+assets/ujaja/*.png
+assets/qrcodes/*.png
+assets/signatures/*.png
+assets/signed_docs/*.pdf
+assets/temp/*
